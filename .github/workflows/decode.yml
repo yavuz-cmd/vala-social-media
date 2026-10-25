@@ -35,6 +35,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Decode images" || echo nothing
-          git pull --rebase || true
-          git push
+          git commit -m "Decode images" || { echo "nothing to commit"; exit 0; }
+          # retry push on races with concurrent uploads; never fail the run for a lost race
+          for i in 1 2 3 4 5 6; do
+            git pull --rebase -X theirs origin main && git push && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep $((i*5))
+          done
+          echo "push lost race repeatedly; next run will finish the job"
+          exit 0
