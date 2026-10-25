@@ -13,19 +13,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - run: |
           set -e
           if [ ! -d b64 ]; then echo "no b64 dir"; exit 0; fi
-          find b64 -name '*.b64.part*' | sed 's/\.part[0-9]*$//' | sort -u | while read b; do
+          # chunked files: assemble only when <name>.b64.done marker exists
+          find b64 -name '*.b64.done' | while read d; do
+            b="${d%.done}"
             ls "$b".part* | sort | xargs cat > "$b"
-            rm -f "$b".part*
+            git rm -q --cached "$b".part* "$d" 2>/dev/null || true
+            rm -f "$b".part* "$d"
           done
           find b64 -name '*.b64' | while read f; do
             out="${f#b64/}"; out="${out%.b64}"
             mkdir -p "$(dirname "$out")"
             base64 -d "$f" > "$out"
+            git rm -q --cached "$f" 2>/dev/null || true
+            rm -f "$f"
           done
-          rm -rf b64
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
